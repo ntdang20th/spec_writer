@@ -45,7 +45,7 @@ services:
       - "8000:8000"
     volumes:
       # Mount your Finance Bridge codebase (read-only)
-      - //d/Git/Premex.FinanceBridge:/app/codebase:ro
+      - //d/Git/Helpdesk-BED:/app/codebase:ro
       # Persist index data between container restarts
       - ./data/chroma:/app/data/chroma
       - ./data/graph:/app/data/graph
