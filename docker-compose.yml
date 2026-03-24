@@ -12,7 +12,7 @@
 # │   ├── config.py              <- LLM/embedding model config
 # │   ├── indexer.py             <- indexing pipeline
 # │   ├── query_engine.py        <- query + spec generation
-# │   └── codebase/              <- mount your Helpdesk-BED repo here
+# │   └── codebase/              <- mount your Finance Bridge repo here
 # ├── data/
 # │   ├── chroma/                <- vector store persistence
 # │   └── graph/                 <- graph store persistence
@@ -44,7 +44,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount your Helpdesk-BED codebase (read-only)
+      # Mount your Finance Bridge codebase (read-only)
       - //d/Git/Helpdesk-BED:/app/codebase:ro
       # Persist index data between container restarts
       - ./data/chroma:/app/data/chroma
@@ -77,27 +77,16 @@ services:
       - ANONYMIZED_TELEMETRY=FALSE
 
   # -----------------------------------------------------------
-  # 4. Neo4j — graph database (enable in Phase 3)
+  # 4. Neo4j — graph database (Phase 3: GraphRAG)
   # -----------------------------------------------------------
-  # neo4j:
-  #   image: neo4j:5.26-community
-  #   container_name: spec-writer-neo4j
-  #   ports:
-  #     - "7474:7474"    # Browser UI
-  #     - "7687:7687"    # Bolt protocol
-  #   volumes:
-  #     - ./neo4j/data:/data
-  #   environment:
-  #     - NEO4J_AUTH=neo4j/specwriter123
-  #     - NEO4J_PLUGINS=["apoc"]
-
-# -----------------------------------------------------------
-  # 5. ChromaDB UI — visual explorer for vector store
-  # -----------------------------------------------------------
-  chromadb-ui:
-    image: nicholasgriffintn/chromadb-ui:latest
-    container_name: spec-writer-chroma-ui
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: spec-writer-neo4j
     ports:
-      - "3000:3000"
+      - "7474:7474"    # Browser UI
+      - "7687:7687"    # Bolt protocol
+    volumes:
+      - ./neo4j/data:/data
     environment:
-      - VITE_API_URL=http://localhost:8100
+      - NEO4J_AUTH=neo4j/specwriter123
+      - NEO4J_PLUGINS=["apoc"]
