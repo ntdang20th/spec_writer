@@ -1,0 +1,18 @@
+# Data persistence (large, local-only)
+data/chroma/
+data/graph/
+neo4j/data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/

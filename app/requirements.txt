@@ -1,0 +1,34 @@
+# spec-writer/app/requirements.txt
+# ──────────────────────────────────
+# Core framework
+llama-index==0.12.5
+
+# LLM providers
+llama-index-llms-ollama          # Local models via Ollama
+llama-index-llms-anthropic       # Claude API (optional, Phase 5)
+
+# Embedding providers
+llama-index-embeddings-ollama    # Local embeddings via Ollama
+llama-index-embeddings-huggingface  # Alternative: run embed model in-process
+
+# Vector store
+llama-index-vector-stores-chroma # ChromaDB integration
+chromadb-client                  # ChromaDB HTTP client
+
+# Graph store (Phase 3 — uncomment when ready)
+# llama-index-graph-stores-neo4j
+
+# Code parsing
+tree-sitter                      # AST parser for syntax-aware chunking
+tree-sitter-c-sharp              # C# grammar for tree-sitter
+
+# Structured output
+pydantic>=2.0                    # Spec schema definitions
+
+# API layer (Phase 6 — uncomment when ready)
+# fastapi
+# uvicorn[standard]
+
+# Utilities
+python-dotenv                    # Load .env files
+rich                             # Pretty terminal output for debugging
