@@ -1,6 +1,6 @@
 # spec-writer/app/loader.py
 """
-Load Finance Bridge codebase into LlamaIndex Documents.
+Load Helpdesk-BED codebase into LlamaIndex Documents.
 Each file becomes one Document with rich metadata.
 """
 import os
@@ -108,7 +108,7 @@ def _detect_category(path: str, content: str) -> str:
 
 # ── Run directly to test ───────────────────────────────────
 if __name__ == "__main__":
-    rprint("\n[bold]Loading Finance Bridge codebase...[/bold]\n")
+    rprint("\n[bold]Loading Helpdesk-BED codebase...[/bold]\n")
     docs = load_codebase()
 
     # Summary by category

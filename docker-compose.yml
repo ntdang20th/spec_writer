@@ -12,7 +12,7 @@
 # │   ├── config.py              <- LLM/embedding model config
 # │   ├── indexer.py             <- indexing pipeline
 # │   ├── query_engine.py        <- query + spec generation
-# │   └── codebase/              <- mount your Finance Bridge repo here
+# │   └── codebase/              <- mount your Helpdesk-BED repo here
 # ├── data/
 # │   ├── chroma/                <- vector store persistence
 # │   └── graph/                 <- graph store persistence
@@ -44,7 +44,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount your Finance Bridge codebase (read-only)
+      # Mount your Helpdesk-BED codebase (read-only)
       - //d/Git/Helpdesk-BED:/app/codebase:ro
       # Persist index data between container restarts
       - ./data/chroma:/app/data/chroma
@@ -66,7 +66,7 @@ services:
   # 3. ChromaDB — vector database
   # -----------------------------------------------------------
   chromadb:
-    image: chromadb/chroma:0.5.23
+    image: chromadb/chroma:1.5.5
     container_name: spec-writer-chromadb
     ports:
       - "8100:8000"
