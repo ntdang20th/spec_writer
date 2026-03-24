@@ -21,6 +21,7 @@ chromadb-client                  # ChromaDB HTTP client
 # Code parsing
 tree-sitter                      # AST parser for syntax-aware chunking
 tree-sitter-c-sharp              # C# grammar for tree-sitter
+tree-sitter-language-pack        # Language pack required by LlamaIndex CodeSplitter
 
 # Structured output
 pydantic>=2.0                    # Spec schema definitions
