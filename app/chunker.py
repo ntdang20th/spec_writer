@@ -1,16 +1,21 @@
 # spec-writer/app/chunker.py
 """
-Smart chunking for C# codebases using tree-sitter AST parsing.
-Splits by class/method boundaries instead of arbitrary character counts.
-Falls back to token-based splitting for non-C# files.
+Smart chunking for C# codebases.
+Uses tree-sitter for AST-aware splitting by class/method boundaries.
+Falls back to token-based splitting for non-C# files or on parse errors.
 """
+import tree_sitter_c_sharp as tscsharp
+from tree_sitter import Language, Parser
 from llama_index.core import Document
-from llama_index.core.node_parser import (
-    CodeSplitter,
-    SentenceSplitter,
-)
+from llama_index.core.node_parser import CodeSplitter, SentenceSplitter
 from llama_index.core.schema import TextNode
 from rich import print as rprint
+
+
+def _make_cs_parser() -> Parser:
+    """Build a tree-sitter parser for C# from the installed grammar."""
+    parser = Parser(Language(tscsharp.language()))
+    return parser
 
 
 def chunk_documents(docs: list[Document]) -> list[TextNode]:
@@ -26,13 +31,15 @@ def chunk_documents(docs: list[Document]) -> list[TextNode]:
 
     # ── C# files: AST-aware chunking ──────────────────────
     if cs_docs:
-        cs_splitter = CodeSplitter(
-            language="c_sharp",
-            chunk_lines=60,        # target ~60 lines per chunk
-            chunk_lines_overlap=5, # small overlap for context
-            max_chars=3000,        # hard cap per chunk
-        )
         try:
+            parser = _make_cs_parser()
+            cs_splitter = CodeSplitter(
+                language="c_sharp",
+                parser=parser,         # pass our own parser
+                chunk_lines=60,        # target ~60 lines per chunk
+                chunk_lines_overlap=5, # small overlap for context
+                max_chars=3000,        # hard cap per chunk
+            )
             cs_nodes = cs_splitter.get_nodes_from_documents(cs_docs)
             nodes.extend(cs_nodes)
             rprint(f"  C# files:    {len(cs_docs):4d} docs → [green]{len(cs_nodes):5d} chunks[/green] (AST-aware)")
