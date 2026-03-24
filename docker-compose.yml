@@ -90,3 +90,14 @@ services:
   #   environment:
   #     - NEO4J_AUTH=neo4j/specwriter123
   #     - NEO4J_PLUGINS=["apoc"]
+
+# -----------------------------------------------------------
+  # 5. ChromaDB UI — visual explorer for vector store
+  # -----------------------------------------------------------
+  chromadb-ui:
+    image: nicholasgriffintn/chromadb-ui:latest
+    container_name: spec-writer-chroma-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8100
