@@ -20,7 +20,7 @@ def build_index(nodes: list[TextNode]) -> VectorStoreIndex:
     """
     # ── Connect to ChromaDB ───────────────────────────────
     rprint("[bold]Setting up ChromaDB...[/bold]")
-    client = chromadb.PersistentClient(path="/app/data/chroma")
+    client = chromadb.HttpClient(host="chromadb", port=8000)
     collection = client.get_or_create_collection(
         name="codebase",
         metadata={"hnsw:space": "cosine"},  # cosine similarity
@@ -53,7 +53,7 @@ def load_index() -> VectorStoreIndex:
     Load an existing index from ChromaDB (no re-embedding).
     Use this after the first build_index() call.
     """
-    client = chromadb.PersistentClient(path="/app/data/chroma")
+    client = chromadb.HttpClient(host="chromadb", port=8000)
     collection = client.get_or_create_collection(
         name="codebase",
         metadata={"hnsw:space": "cosine"},
