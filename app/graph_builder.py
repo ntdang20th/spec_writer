@@ -91,8 +91,8 @@ def build_graph_index(nodes: list[TextNode]) -> PropertyGraphIndex:
         possible_entities=ENTITY_TYPES,
         possible_relations=RELATION_TYPES,
         strict=False,        # allow LLM to find types outside our list too
-        num_workers=2,       # parallel extraction (adjust for your CPU/GPU)
-        max_triplets_per_chunk=15,  # cap per chunk to avoid noise
+        num_workers=1,       # sequential — safer for single GPU
+        max_triplets_per_chunk=10,  # reduce to speed up extraction
     )
 
     # ── Implicit extraction ───────────────────────────────
@@ -177,11 +177,17 @@ def _print_graph_stats(index: PropertyGraphIndex):
 
 # ── Run directly to build the graph ───────────────────────
 if __name__ == "__main__":
+    import sys
     from loader import load_codebase
     from chunker import chunk_documents
 
     rprint("\n[bold]Phase 3: Building Knowledge Graph[/bold]")
     rprint("=" * 45)
+
+    # Optional: limit chunks for testing
+    # Usage: python graph_builder.py          → first 100 chunks (test)
+    #        python graph_builder.py --all    → all chunks (full build)
+    full_build = "--all" in sys.argv
 
     rprint("\n[bold]Step 1: Loading documents...[/bold]\n")
     docs = load_codebase()
@@ -189,6 +195,12 @@ if __name__ == "__main__":
 
     rprint("\n[bold]Step 2: Chunking...[/bold]\n")
     nodes = chunk_documents(docs)
+
+    if not full_build:
+        limit = 100
+        rprint(f"\n  [yellow]Test mode: using first {limit} chunks[/yellow]")
+        rprint(f"  Run with --all for full build\n")
+        nodes = nodes[:limit]
 
     rprint(f"\n[bold]Step 3: Building graph + embeddings...[/bold]")
     index = build_graph_index(nodes)
