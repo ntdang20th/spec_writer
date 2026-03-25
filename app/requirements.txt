@@ -16,7 +16,8 @@ llama-index-vector-stores-chroma # ChromaDB integration
 chromadb-client                  # ChromaDB HTTP client
 
 # Graph store (Phase 3 — uncomment when ready)
-# llama-index-graph-stores-neo4j
+llama-index-graph-stores-neo4j
+neo4j
 
 # Code parsing
 tree-sitter                      # AST parser for syntax-aware chunking
