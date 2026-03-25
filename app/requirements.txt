@@ -4,33 +4,32 @@
 llama-index==0.12.5
 
 # LLM providers
-llama-index-llms-ollama          # Local models via Ollama
-llama-index-llms-anthropic       # Claude API (optional, Phase 5)
+llama-index-llms-ollama
+llama-index-llms-anthropic
 
 # Embedding providers
-llama-index-embeddings-ollama    # Local embeddings via Ollama
-llama-index-embeddings-huggingface  # Alternative: run embed model in-process
+llama-index-embeddings-ollama
+llama-index-embeddings-huggingface
 
 # Vector store
-llama-index-vector-stores-chroma # ChromaDB integration
-chromadb-client                  # ChromaDB HTTP client
+llama-index-vector-stores-chroma
+chromadb-client
 
-# Graph store (Phase 3 — uncomment when ready)
+# Graph store (Phase 3)
 llama-index-graph-stores-neo4j
-neo4j
 
 # Code parsing
-tree-sitter                      # AST parser for syntax-aware chunking
-tree-sitter-c-sharp              # C# grammar for tree-sitter
-tree-sitter-language-pack        # Language pack required by LlamaIndex CodeSplitter
+tree-sitter
+tree-sitter-c-sharp
+tree-sitter-language-pack
 
 # Structured output
-pydantic>=2.0                    # Spec schema definitions
+pydantic>=2.0
 
-# API layer (Phase 6 — uncomment when ready)
+# API layer (Phase 6)
 # fastapi
 # uvicorn[standard]
 
 # Utilities
-python-dotenv                    # Load .env files
-rich                             # Pretty terminal output for debugging
+python-dotenv
+rich
