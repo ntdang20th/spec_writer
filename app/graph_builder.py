@@ -6,7 +6,11 @@ Uses batch processing with retry logic to handle LLM timeouts.
 import os
 import json
 import time
+import nest_asyncio
 from pathlib import Path
+
+# Fix async event loop issues with Ollama + LlamaIndex
+nest_asyncio.apply()
 from llama_index.core import (
     PropertyGraphIndex,
     Settings,
@@ -72,6 +76,7 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
     # ── Process in batches ────────────────────────────────
     all_processed = set(processed)
     total_batches = (len(nodes) + batch_size - 1) // batch_size
+    index = None
 
     # We'll build the index incrementally: start with implicit
     # extraction only (fast), then add LLM-extracted triplets
@@ -144,15 +149,16 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
 
             # Save what we have so far
             _save_progress(all_processed)
-            if 'index' in dir():
-                try:
+            try:
+                if index is not None:
                     index.storage_context.persist(persist_dir=GRAPH_PERSIST_DIR)
-                except Exception:
-                    pass
+            except Exception:
+                pass
             break
 
     rprint(f"\n  [green]Graph saved to {GRAPH_PERSIST_DIR}[/green]")
-    _print_graph_stats(index)
+    if index is not None:
+        _print_graph_stats(index)
     return index
 
 
