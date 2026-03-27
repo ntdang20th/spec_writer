@@ -17,8 +17,21 @@ from llama_index.core.indices.property_graph import (
     ImplicitPathExtractor,
 )
 from llama_index.core.schema import TextNode
+from llama_index.llms.ollama import Ollama
 from rich import print as rprint
 import config  # noqa: F401
+
+# ── Dedicated LLM for graph extraction ────────────────────
+# Use a stronger model for triplet extraction — it needs to
+# understand code structure and output structured JSON.
+# Your main LLM (llama3.2) stays for general queries.
+OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+GRAPH_LLM = Ollama(
+    model="qwen2.5-coder:7b",
+    base_url=OLLAMA_URL,
+    request_timeout=600.0,  # 10 min timeout for safety
+    temperature=0.0,        # deterministic extraction
+)
 
 
 # ── 3.2: Entity types for .NET/C# codebases ──────────────
