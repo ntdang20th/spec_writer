@@ -107,12 +107,12 @@ if __name__ == "__main__":
 
     if not args:
         # Default test question
-        ask_compare("How does the ticket system work?")
+        ask_compare("What is this system ?")
     elif args[0] == "--graph":
-        question = " ".join(args[1:]) or "How does the ticket system work?"
+        question = " ".join(args[1:]) or "What is this system ?"
         ask_graph(question)
     elif args[0] == "--compare":
-        question = " ".join(args[1:]) or "How does the ticket system work?"
+        question = " ".join(args[1:]) or "What is this system ?"
         ask_compare(question)
     else:
         question = " ".join(args)

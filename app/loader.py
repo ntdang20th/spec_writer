@@ -1,6 +1,6 @@
 # spec-writer/app/loader.py
 """
-Load Helpdesk-BED codebase into LlamaIndex Documents.
+Load codebase into LlamaIndex Documents.
 Each file becomes one Document with rich metadata.
 """
 import os
@@ -24,7 +24,7 @@ SKIP_FILES = {"AssemblyInfo.cs", "GlobalUsings.cs", ".editorconfig"}
 def load_codebase(root: str = CODEBASE) -> list[Document]:
     """Walk the codebase and create a Document per file."""
     docs = []
-
+   
     for dirpath, dirnames, filenames in os.walk(root):
         # Prune skipped directories in-place
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
@@ -108,7 +108,7 @@ def _detect_category(path: str, content: str) -> str:
 
 # ── Run directly to test ───────────────────────────────────
 if __name__ == "__main__":
-    rprint("\n[bold]Loading Helpdesk-BED codebase...[/bold]\n")
+    rprint("\n[bold]Loading codebase...[/bold]\n")
     docs = load_codebase()
 
     # Summary by category
