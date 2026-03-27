@@ -1,40 +1,10 @@
 # ============================================================
 # Project: spec-writer (RAG + GraphRAG spec generation engine)
 # ============================================================
-# Directory structure:
-#
-# spec-writer/
-# ├── docker-compose.yml        <- this file
-# ├── app/
-# │   ├── Dockerfile
-# │   ├── requirements.txt
-# │   ├── main.py               <- FastAPI entry point (Phase 6)
-# │   ├── config.py              <- LLM/embedding model config
-# │   ├── indexer.py             <- indexing pipeline
-# │   ├── query_engine.py        <- query + spec generation
-# │   └── codebase/              <- mount your Finance Bridge repo here
-# ├── data/
-# │   ├── chroma/                <- vector store persistence
-# │   └── graph/                 <- graph store persistence
-# └── neo4j/                     <- graph database data (Phase 3)
 
 services:
   # -----------------------------------------------------------
-  # 1. Ollama — local LLM server (runs on host for GPU access)
-  #    Install separately: https://ollama.com/download/windows
-  #    Then run: ollama pull llama3.2
-  #              ollama pull nomic-embed-text
-  #
-  #    Why not Docker? Ollama needs direct GPU access.
-  #    On Windows, the native installer handles NVIDIA/AMD
-  #    drivers automatically. Docker GPU passthrough on
-  #    Windows is painful.
-  #
-  #    Ollama runs at: http://localhost:11434
-  # -----------------------------------------------------------
-
-  # -----------------------------------------------------------
-  # 2. App — LlamaIndex + FastAPI (your spec writer engine)
+  # 1. App — LlamaIndex + FastAPI (your spec writer engine)
   # -----------------------------------------------------------
   app:
     build:
@@ -44,26 +14,31 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount your Finance Bridge codebase (read-only)
+      - ./app:/app
       - //d/Git/vc-platform:/app/codebase:ro
-      # Persist index data between container restarts
       - ./data/chroma:/app/data/chroma
       - ./data/graph:/app/data/graph
     environment:
-      # Ollama runs on host, not in Docker
+      # Ollama (runs on host, not in Docker)
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      # Default models (change anytime)
+      # Models
       - LLM_MODEL=llama3.2
       - EMBED_MODEL=nomic-embed-text
+      - GRAPH_LLM_MODEL=qwen2.5-coder:7b
+      # Neo4j
+      - NEO4J_URL=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=specwriter123
       # Optional: Claude API for high-quality output
       # - ANTHROPIC_API_KEY=sk-ant-...
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - chromadb
+      - neo4j
 
   # -----------------------------------------------------------
-  # 3. ChromaDB — vector database
+  # 2. ChromaDB — vector database
   # -----------------------------------------------------------
   chromadb:
     image: chromadb/chroma:1.5.5
@@ -77,14 +52,14 @@ services:
       - ANONYMIZED_TELEMETRY=FALSE
 
   # -----------------------------------------------------------
-  # 4. Neo4j — graph database (Phase 3: GraphRAG)
+  # 3. Neo4j — graph database (GraphRAG)
   # -----------------------------------------------------------
   neo4j:
     image: neo4j:5.26-community
     container_name: spec-writer-neo4j
     ports:
-      - "7474:7474"    # Browser UI
-      - "7687:7687"    # Bolt protocol
+      - "7474:7474"
+      - "7687:7687"
     volumes:
       - ./neo4j/data:/data
     environment:

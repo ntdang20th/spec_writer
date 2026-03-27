@@ -38,13 +38,9 @@ def ask_graph(question: str, top_k: int = 5):
 
     index = load_graph_index()
 
-    # The graph query engine combines:
-    # 1. Vector similarity search (finds relevant chunks)
-    # 2. Graph traversal (follows entity relationships)
-    # 3. LLM synthesis (generates answer from combined context)
     query_engine = index.as_query_engine(
         llm=Settings.llm,
-        include_text=True,     # include original chunk text in context
+        include_text=True,
         similarity_top_k=top_k,
     )
 
@@ -107,12 +103,12 @@ if __name__ == "__main__":
 
     if not args:
         # Default test question
-        ask_compare("What is this system ?")
+        ask_compare("How does the ticket system work?")
     elif args[0] == "--graph":
-        question = " ".join(args[1:]) or "What is this system ?"
+        question = " ".join(args[1:]) or "How does the ticket system work?"
         ask_graph(question)
     elif args[0] == "--compare":
-        question = " ".join(args[1:]) or "What is this system ?"
+        question = " ".join(args[1:]) or "How does the ticket system work?"
         ask_compare(question)
     else:
         question = " ".join(args)

@@ -1,7 +1,7 @@
 # spec-writer/app/graph_builder.py
 """
 Phase 3: Build a knowledge graph from your codebase.
-Uses batch processing with retry logic to handle LLM timeouts.
+Uses Neo4j for persistent graph storage + batch processing with retry.
 """
 import os
 import json
@@ -9,12 +9,11 @@ import time
 import nest_asyncio
 from pathlib import Path
 
-# Fix async event loop issues with Ollama + LlamaIndex
 nest_asyncio.apply()
+
 from llama_index.core import (
     PropertyGraphIndex,
     Settings,
-    StorageContext,
 )
 from llama_index.core.indices.property_graph import (
     SchemaLLMPathExtractor,
@@ -22,6 +21,7 @@ from llama_index.core.indices.property_graph import (
 )
 from llama_index.core.schema import TextNode
 from llama_index.llms.ollama import Ollama
+from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 from rich import print as rprint
 import config  # noqa: F401
 
@@ -33,6 +33,11 @@ GRAPH_LLM = Ollama(
     request_timeout=900.0,
     temperature=0.0,
 )
+
+# ── Neo4j connection ──────────────────────────────────────
+NEO4J_URL = os.getenv("NEO4J_URL", "bolt://neo4j:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "specwriter123")
 
 # ── Entity and relation types ─────────────────────────────
 ENTITY_TYPES = [
@@ -47,13 +52,21 @@ RELATION_TYPES = [
     "HAS_METHOD", "HAS_PROPERTY", "INJECTS", "CONFIGURES", "MAPS_TO",
 ]
 
-GRAPH_PERSIST_DIR = "/app/data/graph"
 PROGRESS_FILE = "/app/data/graph/progress.json"
+
+
+def _get_graph_store() -> Neo4jPropertyGraphStore:
+    """Create a Neo4j graph store connection."""
+    return Neo4jPropertyGraphStore(
+        url=NEO4J_URL,
+        username=NEO4J_USER,
+        password=NEO4J_PASSWORD,
+    )
 
 
 def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGraphIndex:
     """
-    Build graph in batches with retry logic.
+    Build graph in batches with Neo4j persistence and retry logic.
     If it crashes, re-run and it picks up where it left off.
     """
     rprint(f"\n[bold]Building knowledge graph...[/bold]\n")
@@ -63,6 +76,7 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
     rprint(f"  Batch size: {batch_size}")
     rprint(f"  LLM: {GRAPH_LLM.model}")
     rprint(f"  Embed: {Settings.embed_model.model_name}")
+    rprint(f"  Graph store: Neo4j at {NEO4J_URL}")
 
     # ── Check for previous progress ───────────────────────
     processed = _load_progress()
@@ -73,16 +87,11 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
     else:
         rprint()
 
-    # ── Process in batches ────────────────────────────────
     all_processed = set(processed)
     total_batches = (len(nodes) + batch_size - 1) // batch_size
     index = None
 
-    # We'll build the index incrementally: start with implicit
-    # extraction only (fast), then add LLM-extracted triplets
-    # batch by batch.
-
-    Path(GRAPH_PERSIST_DIR).mkdir(parents=True, exist_ok=True)
+    Path(PROGRESS_FILE).parent.mkdir(parents=True, exist_ok=True)
 
     schema_extractor = SchemaLLMPathExtractor(
         llm=GRAPH_LLM,
@@ -95,6 +104,8 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
 
     implicit_extractor = ImplicitPathExtractor()
 
+    graph_store = _get_graph_store()
+
     for batch_num in range(total_batches):
         start = batch_num * batch_size
         end = min(start + batch_size, len(nodes))
@@ -105,80 +116,55 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
 
         try:
             if batch_num == 0 and not processed:
-                # First batch: create the index
                 index = PropertyGraphIndex(
                     nodes=batch,
                     kg_extractors=[schema_extractor, implicit_extractor],
+                    property_graph_store=graph_store,
                     embed_model=Settings.embed_model,
                     show_progress=True,
                 )
             else:
-                if batch_num == 0:
-                    # Resuming: load existing index
-                    storage_context = StorageContext.from_defaults(
-                        persist_dir=GRAPH_PERSIST_DIR,
-                    )
-                    index = PropertyGraphIndex(
-                        storage_context=storage_context,
+                if index is None:
+                    index = PropertyGraphIndex.from_existing(
+                        property_graph_store=graph_store,
                         embed_model=Settings.embed_model,
                     )
 
-                # Insert new batch into existing index
-                index.insert_nodes(
-                    batch,
-                    kg_extractors=[schema_extractor, implicit_extractor],
-                    show_progress=True,
-                )
+                index.insert_nodes(batch)
 
             elapsed = time.time() - t0
             rprint(f"  [green]Done in {elapsed:.0f}s ({elapsed/len(batch):.1f}s/chunk)[/green]")
 
-            # Save progress after each batch
             for i in range(start, end):
                 all_processed.add(i + len(processed))
             _save_progress(all_processed)
-
-            # Persist index after each batch
-            index.storage_context.persist(persist_dir=GRAPH_PERSIST_DIR)
             rprint(f"  [dim]Saved checkpoint[/dim]")
 
         except Exception as e:
             rprint(f"\n  [red]Batch {batch_num + 1} failed: {type(e).__name__}[/red]")
             rprint(f"  [red]{str(e)[:200]}[/red]")
             rprint(f"\n  [yellow]Progress saved. Run again to resume.[/yellow]")
-
-            # Save what we have so far
             _save_progress(all_processed)
-            try:
-                if index is not None:
-                    index.storage_context.persist(persist_dir=GRAPH_PERSIST_DIR)
-            except Exception:
-                pass
             break
 
-    rprint(f"\n  [green]Graph saved to {GRAPH_PERSIST_DIR}[/green]")
     if index is not None:
-        _print_graph_stats(index)
+        _print_graph_stats(graph_store)
     return index
 
 
 def load_graph_index() -> PropertyGraphIndex:
-    """Load a previously built graph index from disk."""
-    if not Path(GRAPH_PERSIST_DIR).exists():
-        raise ValueError(f"No graph at {GRAPH_PERSIST_DIR}. Run build_graph_index() first.")
-
-    rprint(f"  Loading graph from {GRAPH_PERSIST_DIR}...")
-    storage_context = StorageContext.from_defaults(persist_dir=GRAPH_PERSIST_DIR)
-    index = PropertyGraphIndex(
-        storage_context=storage_context,
+    """Load graph index from Neo4j."""
+    rprint(f"  Loading graph from Neo4j...")
+    graph_store = _get_graph_store()
+    index = PropertyGraphIndex.from_existing(
+        property_graph_store=graph_store,
         embed_model=Settings.embed_model,
     )
-    _print_graph_stats(index)
+    _print_graph_stats(graph_store)
     return index
 
 
 def _load_progress() -> set:
-    """Load set of processed chunk indices."""
     if Path(PROGRESS_FILE).exists():
         with open(PROGRESS_FILE) as f:
             return set(json.load(f))
@@ -186,16 +172,14 @@ def _load_progress() -> set:
 
 
 def _save_progress(processed: set):
-    """Save processed chunk indices."""
-    Path(GRAPH_PERSIST_DIR).mkdir(parents=True, exist_ok=True)
+    Path(PROGRESS_FILE).parent.mkdir(parents=True, exist_ok=True)
     with open(PROGRESS_FILE, "w") as f:
         json.dump(list(processed), f)
 
 
-def _print_graph_stats(index: PropertyGraphIndex):
-    """Print summary statistics about the knowledge graph."""
+def _print_graph_stats(graph_store: Neo4jPropertyGraphStore):
+    """Print graph stats directly from Neo4j."""
     try:
-        graph_store = index.property_graph_store
         triplets = graph_store.get_triplets()
         entities = set()
         relations = set()
@@ -217,12 +201,19 @@ def _print_graph_stats(index: PropertyGraphIndex):
         rprint(f"  [yellow]Could not read graph stats: {e}[/yellow]")
 
 
-def reset_progress():
-    """Clear all graph data and progress to start fresh."""
-    import shutil
-    if Path(GRAPH_PERSIST_DIR).exists():
-        shutil.rmtree(GRAPH_PERSIST_DIR)
-    rprint("  [yellow]Graph data and progress cleared.[/yellow]")
+def reset_graph():
+    """Clear all graph data from Neo4j and progress file."""
+    rprint("  Clearing Neo4j graph data...")
+    try:
+        store = _get_graph_store()
+        store.structured_query("MATCH (n) DETACH DELETE n")
+        rprint("  [green]Neo4j cleared[/green]")
+    except Exception as e:
+        rprint(f"  [yellow]Could not clear Neo4j: {e}[/yellow]")
+
+    if Path(PROGRESS_FILE).exists():
+        os.remove(PROGRESS_FILE)
+        rprint("  [green]Progress file cleared[/green]")
 
 
 # ── CLI ───────────────────────────────────────────────────
@@ -232,7 +223,7 @@ if __name__ == "__main__":
     from chunker import chunk_documents
 
     if "--reset" in sys.argv:
-        reset_progress()
+        reset_graph()
         sys.exit(0)
 
     rprint("\n[bold]Phase 3: Building Knowledge Graph[/bold]")
