@@ -4,6 +4,10 @@ Centralised model configuration.
 Change the provider/model here — everything else stays the same.
 """
 import os
+
+import nest_asyncio
+nest_asyncio.apply()
+
 from llama_index.core import Settings
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding

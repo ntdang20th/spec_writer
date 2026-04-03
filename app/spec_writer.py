@@ -6,8 +6,6 @@ specification via the LLM constrained to the Pydantic schema.
 """
 import sys
 import json
-import nest_asyncio
-nest_asyncio.apply()
 
 from llama_index.core import Settings
 from llama_index.core.prompts import PromptTemplate
@@ -48,17 +46,21 @@ Be specific — use actual class names, table names, and patterns from the codeb
 )
 
 
-def generate_spec(feature_description: str, use_graph: bool = True) -> Specification:
+def generate_spec(feature_description: str, use_graph: bool = True, llm=None) -> Specification:
     """
     Generate a specification for a feature using codebase context.
 
     Args:
         feature_description: What the feature should do
         use_graph: If True, use GraphRAG. If False, use vector-only RAG.
+        llm: Optional LLM override (avoids mutating global Settings.llm).
 
     Returns:
         A structured Specification object
     """
+    if llm is None:
+        llm = Settings.llm
+
     rprint(f"\n[bold]Generating specification...[/bold]\n")
     rprint(f"  Feature: {feature_description}")
     rprint(f"  Mode: {'GraphRAG (vector + graph)' if use_graph else 'Vector RAG only'}")
@@ -86,7 +88,7 @@ def generate_spec(feature_description: str, use_graph: bool = True) -> Specifica
     rprint(f"  [dim]Generating specification via LLM...[/dim]\n")
 
     try:
-        spec = Settings.llm.structured_predict(
+        spec = llm.structured_predict(
             Specification,
             SPEC_PROMPT,
             context_str=context,
@@ -94,14 +96,17 @@ def generate_spec(feature_description: str, use_graph: bool = True) -> Specifica
         )
     except Exception as e:
         rprint(f"  [yellow]Structured output failed ({e}), falling back to text generation...[/yellow]")
-        spec = _fallback_generate(context, feature_description)
+        spec = _fallback_generate(context, feature_description, llm=llm)
 
     return spec
 
 
-def _fallback_generate(context: str, feature_description: str) -> Specification:
+def _fallback_generate(context: str, feature_description: str, llm=None) -> Specification:
     """Fallback: generate spec as text, then parse manually."""
     from llama_index.core.llms import ChatMessage
+
+    if llm is None:
+        llm = Settings.llm
 
     prompt = SPEC_PROMPT.format(
         context_str=context,
@@ -111,7 +116,7 @@ def _fallback_generate(context: str, feature_description: str) -> Specification:
         Specification.model_json_schema(), indent=2
     )
 
-    response = Settings.llm.chat([ChatMessage(role="user", content=prompt)])
+    response = llm.chat([ChatMessage(role="user", content=prompt)])
     text = response.message.content
 
     # Try to extract JSON from response

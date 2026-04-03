@@ -6,10 +6,7 @@ Uses Neo4j for persistent graph storage + batch processing with retry.
 import os
 import json
 import time
-import nest_asyncio
 from pathlib import Path
-
-nest_asyncio.apply()
 
 from llama_index.core import (
     PropertyGraphIndex,
@@ -24,9 +21,7 @@ from llama_index.llms.ollama import Ollama
 from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 from rich import print as rprint
 import config  # noqa: F401
-
-# ── Dedicated LLM for graph extraction ────────────────────
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+from config import OLLAMA_URL
 GRAPH_LLM = Ollama(
     model=os.getenv("GRAPH_LLM_MODEL", "mistral:7b-instruct"),
     base_url=OLLAMA_URL,
@@ -80,15 +75,18 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
 
     # ── Check for previous progress ───────────────────────
     processed = _load_progress()
+    all_processed = set(processed)
+
+    # Build (original_index, node) pairs for remaining work
+    remaining = [(i, n) for i, n in enumerate(nodes) if i not in all_processed]
+
     if processed:
         rprint(f"\n  [yellow]Resuming: {len(processed)} chunks already done[/yellow]")
-        nodes = [n for i, n in enumerate(nodes) if i not in processed]
-        rprint(f"  Remaining: {len(nodes)} chunks\n")
+        rprint(f"  Remaining: {len(remaining)} chunks\n")
     else:
         rprint()
 
-    all_processed = set(processed)
-    total_batches = (len(nodes) + batch_size - 1) // batch_size
+    total_batches = (len(remaining) + batch_size - 1) // batch_size
     index = None
 
     Path(PROGRESS_FILE).parent.mkdir(parents=True, exist_ok=True)
@@ -108,16 +106,18 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
 
     for batch_num in range(total_batches):
         start = batch_num * batch_size
-        end = min(start + batch_size, len(nodes))
-        batch = nodes[start:end]
+        end = min(start + batch_size, len(remaining))
+        batch_items = remaining[start:end]
+        batch_nodes = [n for _, n in batch_items]
+        batch_indices = [i for i, _ in batch_items]
 
-        rprint(f"\n  [bold]Batch {batch_num + 1}/{total_batches}[/bold] ({len(batch)} chunks)")
+        rprint(f"\n  [bold]Batch {batch_num + 1}/{total_batches}[/bold] ({len(batch_nodes)} chunks)")
         t0 = time.time()
 
         try:
             if batch_num == 0 and not processed:
                 index = PropertyGraphIndex(
-                    nodes=batch,
+                    nodes=batch_nodes,
                     kg_extractors=[schema_extractor, implicit_extractor],
                     property_graph_store=graph_store,
                     embed_model=Settings.embed_model,
@@ -130,13 +130,13 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
                         embed_model=Settings.embed_model,
                     )
 
-                index.insert_nodes(batch)
+                index.insert_nodes(batch_nodes)
 
             elapsed = time.time() - t0
-            rprint(f"  [green]Done in {elapsed:.0f}s ({elapsed/len(batch):.1f}s/chunk)[/green]")
+            rprint(f"  [green]Done in {elapsed:.0f}s ({elapsed/len(batch_nodes):.1f}s/chunk)[/green]")
 
-            for i in range(start, end):
-                all_processed.add(i + len(processed))
+            for idx in batch_indices:
+                all_processed.add(idx)
             _save_progress(all_processed)
             rprint(f"  [dim]Saved checkpoint[/dim]")
 
@@ -146,6 +146,17 @@ def build_graph_index(nodes: list[TextNode], batch_size: int = 10) -> PropertyGr
             rprint(f"\n  [yellow]Progress saved. Run again to resume.[/yellow]")
             _save_progress(all_processed)
             break
+
+    # If no index was created (all batches failed or resumed with no new work),
+    # try to load the existing graph so callers get a usable index.
+    if index is None:
+        try:
+            index = PropertyGraphIndex.from_existing(
+                property_graph_store=graph_store,
+                embed_model=Settings.embed_model,
+            )
+        except Exception:
+            pass
 
     if index is not None:
         _print_graph_stats(graph_store)

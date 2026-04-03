@@ -20,14 +20,12 @@ def _make_cs_parser() -> Parser:
 
 def chunk_documents(docs: list[Document]) -> list[TextNode]:
     """
-    Chunk C# documents using tree-sitter AST-aware splitting.
-    Non-C# files are skipped (JSON/config can be added later).
+    Chunk documents using the best strategy per file type.
+    - C# files: tree-sitter AST-aware splitting (class/method level)
+    - Other files: sentence/token-based splitting with overlap
     """
     cs_docs = [d for d in docs if d.metadata.get("extension") == ".cs"]
-    skipped = len(docs) - len(cs_docs)
-
-    if skipped:
-        rprint(f"  Skipped {skipped} non-C# files")
+    other_docs = [d for d in docs if d.metadata.get("extension") != ".cs"]
 
     nodes = []
 
@@ -41,16 +39,24 @@ def chunk_documents(docs: list[Document]) -> list[TextNode]:
                 chunk_lines_overlap=5,
                 max_chars=3000,
             )
-            nodes = cs_splitter.get_nodes_from_documents(cs_docs)
-            rprint(f"  C# files:  {len(cs_docs):4d} docs → [green]{len(nodes):5d} chunks[/green] (AST-aware)")
+            cs_nodes = cs_splitter.get_nodes_from_documents(cs_docs)
+            nodes.extend(cs_nodes)
+            rprint(f"  C# files:    {len(cs_docs):4d} docs → [green]{len(cs_nodes):5d} chunks[/green] (AST-aware)")
         except Exception as e:
             rprint(f"  [yellow]AST chunking failed, falling back to text splitting: {e}[/yellow]")
             fallback = SentenceSplitter(chunk_size=1024, chunk_overlap=128)
-            nodes = fallback.get_nodes_from_documents(cs_docs)
-            rprint(f"  C# files:  {len(cs_docs):4d} docs → [yellow]{len(nodes):5d} chunks[/yellow] (fallback)")
+            cs_nodes = fallback.get_nodes_from_documents(cs_docs)
+            nodes.extend(cs_nodes)
+            rprint(f"  C# files:    {len(cs_docs):4d} docs → [yellow]{len(cs_nodes):5d} chunks[/yellow] (fallback)")
+
+    if other_docs:
+        text_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=128)
+        other_nodes = text_splitter.get_nodes_from_documents(other_docs)
+        nodes.extend(other_nodes)
+        rprint(f"  Other files: {len(other_docs):4d} docs → [green]{len(other_nodes):5d} chunks[/green] (text split)")
 
     rprint(f"  {'─'*45}")
-    rprint(f"  Total:     {len(cs_docs):4d} docs → [bold green]{len(nodes):5d} chunks[/bold green]")
+    rprint(f"  Total:       {len(docs):4d} docs → [bold green]{len(nodes):5d} chunks[/bold green]")
 
     return nodes
 

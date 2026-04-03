@@ -5,17 +5,13 @@ Swaps models at runtime — no restart needed.
 """
 import sys
 import time
-import os
-import nest_asyncio
-nest_asyncio.apply()
 
 from llama_index.core import Settings
 from llama_index.llms.ollama import Ollama
 from rich import print as rprint
 from spec_writer import generate_spec, print_spec, export_spec_markdown
 import config  # noqa: F401
-
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+from config import OLLAMA_URL
 
 # ── Models to benchmark ───────────────────────────────────
 # Pull these first:  ollama pull <model>

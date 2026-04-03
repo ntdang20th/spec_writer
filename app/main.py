@@ -3,7 +3,7 @@
 Phase 6: FastAPI REST API for the spec writer engine.
 Exposes spec generation, querying, and indexing as HTTP endpoints.
 """
-import os
+import logging
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +13,9 @@ from pydantic import BaseModel, Field
 from llama_index.core import Settings
 from llama_index.llms.ollama import Ollama
 import config  # noqa: F401
+from config import OLLAMA_URL
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Spec Writer API",
@@ -22,15 +25,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Serve static files (Web UI)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 
 # ── Request/Response models ───────────────────────────────
@@ -93,13 +98,22 @@ def get_status():
     try:
         from graph_builder import _get_graph_store
         store = _get_graph_store()
-        triplets = store.get_triplets()
-        entities = set()
-        for s, r, o in triplets:
-            entities.add(str(s))
-            entities.add(str(o))
-        graph_entities = len(entities)
-        graph_triplets = len(triplets)
+        try:
+            result = store.structured_query("MATCH (n) RETURN count(n) AS cnt")
+            if result and isinstance(result, list) and result[0]:
+                graph_entities = result[0].get("cnt", 0) if isinstance(result[0], dict) else 0
+            result = store.structured_query("MATCH ()-[r]->() RETURN count(r) AS cnt")
+            if result and isinstance(result, list) and result[0]:
+                graph_triplets = result[0].get("cnt", 0) if isinstance(result[0], dict) else 0
+        except Exception:
+            # Fallback: fetch all triplets (slow on large graphs)
+            triplets = store.get_triplets()
+            entities = set()
+            for s, r, o in triplets:
+                entities.add(str(s))
+                entities.add(str(o))
+            graph_entities = len(entities)
+            graph_triplets = len(triplets)
     except Exception:
         pass
 
@@ -147,7 +161,8 @@ def query_codebase(req: QueryRequest):
             mode=req.mode,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Query failed")
+        raise HTTPException(status_code=500, detail="Query failed")
 
 
 @app.post("/spec", response_model=SpecResponse)
@@ -155,12 +170,12 @@ def generate_specification(req: SpecRequest):
     """Generate a structured specification for a feature."""
     from spec_writer import generate_spec, export_spec_markdown
 
-    # Optional model override
-    original_llm = Settings.llm
+    # Build a local LLM instance if overridden — never mutate global Settings.llm
+    llm = None
     model_used = Settings.llm.model
 
     if req.model:
-        Settings.llm = Ollama(
+        llm = Ollama(
             model=req.model,
             base_url=OLLAMA_URL,
             request_timeout=600.0,
@@ -169,7 +184,7 @@ def generate_specification(req: SpecRequest):
         model_used = req.model
 
     try:
-        spec = generate_spec(req.feature, use_graph=req.use_graph)
+        spec = generate_spec(req.feature, use_graph=req.use_graph, llm=llm)
         md = export_spec_markdown(spec)
 
         return SpecResponse(
@@ -179,9 +194,8 @@ def generate_specification(req: SpecRequest):
             mode="graph" if req.use_graph else "vector",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        Settings.llm = original_llm
+        logger.exception("Spec generation failed")
+        raise HTTPException(status_code=500, detail="Spec generation failed")
 
 
 @app.post("/index/vector")
@@ -197,7 +211,8 @@ def rebuild_vector_index():
         build_index(nodes)
         return {"status": "ok", "documents": len(docs), "chunks": len(nodes)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Vector index rebuild failed")
+        raise HTTPException(status_code=500, detail="Vector index rebuild failed")
 
 
 @app.post("/index/graph")
@@ -216,7 +231,8 @@ def rebuild_graph_index(req: IndexRequest):
         build_graph_index(nodes, batch_size=10)
         return {"status": "ok", "documents": len(docs), "chunks": len(nodes)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Graph index rebuild failed")
+        raise HTTPException(status_code=500, detail="Graph index rebuild failed")
 
 
 @app.post("/index/incremental")
@@ -236,10 +252,11 @@ def incremental_update():
         if not changes["added"] and not changes["modified"] and not changes["deleted"]:
             return {"status": "up_to_date", **summary}
 
-        incremental_index()
+        incremental_index(changes=changes)
         return {"status": "ok", **summary}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Incremental indexing failed")
+        raise HTTPException(status_code=500, detail="Incremental indexing failed")
 
 
 @app.get("/index/changes")
@@ -259,4 +276,5 @@ def check_changes():
             "deleted_files": changes["deleted"][:20],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Change detection failed")
+        raise HTTPException(status_code=500, detail="Change detection failed")

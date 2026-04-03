@@ -40,7 +40,7 @@ def load_codebase(root: str = CODEBASE) -> list[Document]:
             rel_path = os.path.relpath(filepath, root)
 
             try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
             except Exception as e:
                 rprint(f"  [yellow]Skip[/yellow] {rel_path}: {e}")

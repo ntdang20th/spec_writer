@@ -13,8 +13,6 @@ import sys
 import json
 import hashlib
 import time
-import nest_asyncio
-nest_asyncio.apply()
 
 from pathlib import Path
 from llama_index.core import Settings
@@ -85,18 +83,24 @@ def detect_changes() -> dict:
         "deleted": deleted,
         "unchanged": unchanged,
         "new_hashes": new_hashes,
+        "_docs": docs,
     }
 
 
-def incremental_index(update_vector: bool = True, update_graph: bool = True):
+def incremental_index(update_vector: bool = True, update_graph: bool = True, changes: dict = None):
     """
     Index only files that changed since last run.
     - New/modified files: chunk, embed, and extract graph
     - Deleted files: remove from vector store (graph cleanup is manual)
+
+    Args:
+        changes: Pre-computed changes dict from detect_changes() to avoid
+                 re-scanning the codebase.
     """
     rprint("\n[bold]Incremental indexing[/bold]\n")
 
-    changes = detect_changes()
+    if changes is None:
+        changes = detect_changes()
     added = changes["added"]
     modified = changes["modified"]
     deleted = changes["deleted"]
@@ -116,7 +120,7 @@ def incremental_index(update_vector: bool = True, update_graph: bool = True):
     # Load only changed files
     if changed_paths:
         rprint(f"  [bold]Loading {len(changed_paths)} changed files...[/bold]")
-        all_docs = load_codebase()
+        all_docs = changes.get("_docs") or load_codebase()
         changed_docs = [d for d in all_docs if d.metadata["file_path"] in changed_paths]
         rprint(f"  Loaded {len(changed_docs)} documents")
 
