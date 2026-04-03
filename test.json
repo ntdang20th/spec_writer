@@ -1,0 +1,61 @@
+{
+  "spec": {
+    "title": "UpdateCategory API",
+    "overview": "This feature adds an API to update a category in the application.",
+    "entities_affected": [],
+    "api_contracts": [
+      {
+        "method": "PUT",
+        "path": "/categories/{id}",
+        "description": "Update a category",
+        "request_body": "CategoryUpdateRequest",
+        "response_body": "CategoryDto"
+      }
+    ],
+    "message_contracts": [
+      {
+        "name": "CategoryUpdatedSuccessMessage",
+        "direction": "server-to-client",
+        "description": "The category has been updated successfully.",
+        "fields": ""
+      },
+      {
+        "name": "CategoryAlreadyExistsError",
+        "direction": "client-to-server",
+        "description": "A category with the same code already exists.",
+        "fields": ""
+      }
+    ],
+    "data_model_changes": "",
+    "dependencies": "",
+    "implementation_steps": [
+      "Why: We need to update a category in the database.",
+      "When: The client sends a PUT request to the /categories/{id} endpoint with the updated category data.",
+      "Then: The server updates the category in the database and returns the updated category data in the response body.",
+      "Why: We need to validate the input data before updating the category.",
+      "When: The client sends a PUT request to the /categories/{id} endpoint with invalid or missing data.",
+      "Then: The server returns an error message indicating that the data is invalid or missing.",
+      "Why: We need to handle any exceptions that may occur during the update process.",
+      "When: An exception occurs while updating the category in the database.",
+      "Then: The server returns an error message to the client."
+    ],
+    "test_cases": [
+      {
+        "scenario": "Update a valid category",
+        "given": "A valid category with id = 1 and code = 'ABC' and name = 'Test Category'",
+        "when": "The client sends a PUT request to the /categories/1 endpoint with the updated category data.",
+        "then": "The server returns the updated category data in the response body."
+      },
+      {
+        "scenario": "Update a category with an existing code",
+        "given": "A category with id = 2 and code = 'ABC' and name = 'Test Category'",
+        "when": "The client sends a PUT request to the /categories/2 endpoint with the updated category data.",
+        "then": "The server returns an error message indicating that a category with the same code already exists."
+      }
+    ],
+    "notes": "This feature uses the existing CategoryService class and CategoryController class in the application. The API contract is defined using the DayPay.Dtos.CategoryUpdateRequest and DayPay.Dtos.CategoryDto classes. The implementation steps follow the existing validation and exception handling patterns in the application. The test cases cover both valid and invalid scenarios for updating a category."
+  },
+  "markdown": "# UpdateCategory API\n\n## Overview\nThis feature adds an API to update a category in the application.\n\n## API contracts\n### PUT /categories/{id}\nUpdate a category\n- Request: `CategoryUpdateRequest`\n- Response: `CategoryDto`\n\n## Message contracts\n### CategoryUpdatedSuccessMessage (server-to-client)\nThe category has been updated successfully.\n\n### CategoryAlreadyExistsError (client-to-server)\nA category with the same code already exists.\n\n## Implementation steps\n1. Why: We need to update a category in the database.\n2. When: The client sends a PUT request to the /categories/{id} endpoint with the updated category data.\n3. Then: The server updates the category in the database and returns the updated category data in the response body.\n4. Why: We need to validate the input data before updating the category.\n5. When: The client sends a PUT request to the /categories/{id} endpoint with invalid or missing data.\n6. Then: The server returns an error message indicating that the data is invalid or missing.\n7. Why: We need to handle any exceptions that may occur during the update process.\n8. When: An exception occurs while updating the category in the database.\n9. Then: The server returns an error message to the client.\n\n## Test cases\n### Update a valid category\n- **Given**: A valid category with id = 1 and code = 'ABC' and name = 'Test Category'\n- **When**: The client sends a PUT request to the /categories/1 endpoint with the updated category data.\n- **Then**: The server returns the updated category data in the response body.\n\n### Update a category with an existing code\n- **Given**: A category with id = 2 and code = 'ABC' and name = 'Test Category'\n- **When**: The client sends a PUT request to the /categories/2 endpoint with the updated category data.\n- **Then**: The server returns an error message indicating that a category with the same code already exists.\n\n## Notes\nThis feature uses the existing CategoryService class and CategoryController class in the application. The API contract is defined using the DayPay.Dtos.CategoryUpdateRequest and DayPay.Dtos.CategoryDto classes. The implementation steps follow the existing validation and exception handling patterns in the application. The test cases cover both valid and invalid scenarios for updating a category.\n",
+  "model_used": "llama3.2",
+  "mode": "graph"
+}

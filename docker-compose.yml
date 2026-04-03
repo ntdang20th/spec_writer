@@ -11,11 +11,12 @@ services:
       context: ./app
       dockerfile: Dockerfile
     container_name: spec-writer
+    entrypoint: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "asyncio"]
     ports:
       - "8000:8000"
     volumes:
       - ./app:/app
-      - //d/Git/vc-platform:/app/codebase:ro
+      - //d/Git/daypayapi:/app/codebase:ro
       - ./data/chroma:/app/data/chroma
       - ./data/graph:/app/data/graph
     environment:

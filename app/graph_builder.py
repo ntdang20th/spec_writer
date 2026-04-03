@@ -28,7 +28,7 @@ import config  # noqa: F401
 # ── Dedicated LLM for graph extraction ────────────────────
 OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 GRAPH_LLM = Ollama(
-    model=os.getenv("GRAPH_LLM_MODEL", "qwen2.5-coder:7b"),
+    model=os.getenv("GRAPH_LLM_MODEL", "mistral:7b-instruct"),
     base_url=OLLAMA_URL,
     request_timeout=900.0,
     temperature=0.0,
